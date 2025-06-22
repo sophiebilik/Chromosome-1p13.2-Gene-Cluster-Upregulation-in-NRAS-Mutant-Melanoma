@@ -1,0 +1,246 @@
+library(tidyverse)
+expr <- read.delim("mRNA expression z-scores relative to diploid samples (RNA Seq V2 RSEM).txt",
+                   header = TRUE, sep = "\t", check.names = FALSE)
+expr <- read.delim("expression.txt", header = TRUE, sep = "\t", check.names = FALSE)
+setwd("~/Downloads")  # or wherever your file is
+expr <- read.delim("expression.txt", header = TRUE, sep = "\t", check.names = FALSE)
+mut <- read.delim("mutations.txt", header = TRUE, sep = "\t")
+# Identify NRAS-mutant samples
+mut_nras <- mut %>%
+  filter(Hugo_Symbol == "NRAS") %>%
+  select(Sample_ID) %>%
+  distinct() %>%
+  mutate(NRAS_status = "Mutant")
+colnames(mut)
+mut <- read.delim("mutations.txt", header = TRUE, sep = "\t")
+colnames(mut)
+# Load the NRAS mutation status table
+nras_status <- read.delim("mutationsnras.txt", header = TRUE, sep = "\t")
+# Preview the top few rows
+head(nras_status)
+# Check column names
+colnames(nras_status)
+nras_status <- nras_status %>%
+  mutate(NRAS_status = ifelse(NRAS == "WT", "WT", "Mutant")) %>%
+  select(SAMPLE_ID, NRAS_status)
+# Load expression data
+expr <- read.delim("expression.txt", header = TRUE, sep = "\t")  # update if your file is renamed
+
+# Merge with NRAS mutation status
+expr_merged <- expr %>%
+  rename(Sample_ID = SAMPLE_ID) %>%
+  left_join(nras_status, by = "Sample_ID") %>%
+  filter(!is.na(NRAS_status))  # keep only matched samples
+
+# Confirm group sizes
+table(expr_merged$NRAS_status)
+head(expr)
+str(expr)
+
+
+library(tidyverse)
+colnames(expr) <- make.names(colnames(expr), unique = TRUE)
+colnames(nras_status) <- make.names(colnames(nras_status), unique = TRUE)
+expr <- expr %>% rename(Sample_ID = SAMPLE_ID)
+nras_status <- nras_status %>% rename(Sample_ID = SAMPLE_ID)
+expr_merged <- expr %>%
+  left_join(nras_status, by = "Sample_ID") %>%
+  filter(!is.na(NRAS_status))
+
+
+colnames(expr)
+colnames(nras_status)
+# Rename in expression file
+colnames(expr)[colnames(expr) == "SAMPLE_ID"] <- "Sample_ID"
+
+# Rename in NRAS status file
+colnames(nras_status)[colnames(nras_status) == "SAMPLE_ID"] <- "Sample_ID"
+expr_merged <- left_join(expr, nras_status, by = "Sample_ID") %>%
+  filter(!is.na(NRAS_status))
+
+colnames(expr)
+# Rename SAMPLE_ID to Sample_ID in both dataframes
+expr <- expr %>% rename(Sample_ID = SAMPLE_ID)
+nras_status <- nras_status %>% rename(Sample_ID = SAMPLE_ID)
+expr <- read.delim("expression.txt", sep = "\t", header = TRUE, check.names = TRUE)
+
+colnames(expr)
+head(expr[, 1:5])
+
+str(expr)
+
+expr <- read.delim("expression.txt",
+                   sep = "\t",
+                   header = TRUE,
+                   quote = "",
+                   check.names = TRUE,
+                   stringsAsFactors = FALSE)
+colnames(expr)
+head(expr[, 1:5])
+expr <- read.delim("expression2.txt", header = TRUE, sep = "\t", check.names = TRUE)
+head(colnames(expr), 20)   # See the first few column names
+dim(expr)                  # Rows x columns
+library(tidyverse)
+
+# Transpose: move samples to rows, genes to columns
+expr_t <- expr %>%
+  column_to_rownames(var = "Hugo_Symbol") %>%  # Set gene names as rownames
+  t() %>%                                     # Transpose
+  as.data.frame() %>%
+  rownames_to_column(var = "Sample_ID")       # Make sample ID a column
+mut <- read.delim("mutationsnras.txt", header = TRUE, sep = "\t")
+colnames(expr_t)
+colnames(mut)
+expr <- read.delim("expression2.txt", header = TRUE, sep = "\t", check.names = TRUE)
+head(expr[, 1:5])
+colnames(expr)[1:5]
+expr <- expr %>% rename(Sample_ID = SAMPLE_ID)
+mut <- mut %>% rename(Sample_ID = SAMPLE_ID)
+merged_df <- left_join(expr, mut, by = "Sample_ID") %>%
+  filter(!is.na(NRAS_status))
+colnames(mut)
+head(mut)
+mut <- mut %>%
+  mutate(NRAS_status = ifelse(NRAS == "WT", "WT", "Mutant")) %>%
+  select(Sample_ID, NRAS_status)
+merged_df <- left_join(expr, mut, by = "Sample_ID") %>%
+  filter(!is.na(NRAS_status))
+gene_list <- c("GNAI3", "SLC25A24", "SYPL2", "SIKE1", "STRIP1", "PRPF38B", "TAF13", "NBPF6")
+
+results <- map_dfr(gene_list, function(gene) {
+  t <- t.test(merged_df[[gene]] ~ merged_df$NRAS_status)
+  tibble(
+    Gene = gene,
+    p_value = signif(t$p.value, 4),
+    Mean_Mutant = round(t$estimate[1], 3),
+    Mean_WT = round(t$estimate[2], 3)
+  )
+})
+
+print(results)
+
+
+library(ggplot2)
+library(tidyr)
+plot_df <- merged_df %>%
+  select(Sample_ID, NRAS_status, all_of(gene_list)) %>%
+  pivot_longer(cols = gene_list, names_to = "Gene", values_to = "Expression")
+ggplot(plot_df, aes(x = NRAS_status, y = Expression, fill = NRAS_status)) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.7) +
+  geom_jitter(width = 0.2, size = 0.6, alpha = 0.5) +
+  facet_wrap(~Gene, scales = "free_y") +
+  theme_minimal() +
+  labs(x = NULL, y = "Expression Z-score") +
+  scale_fill_manual(values = c("WT" = "#999999", "Mutant" = "#E64B35")) +
+  theme(strip.text = element_text(size = 12, face = "bold"))
+
+install.packages("ggpubr")
+
+
+
+
+
+# Load libraries
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(ggpubr)
+
+# Step 1: Load data
+expr <- read.delim("expression2.txt", header = TRUE, sep = "\t", check.names = TRUE)
+mut <- read.delim("mutationsnras.txt", header = TRUE, sep = "\t", check.names = TRUE)
+
+# Step 2: Standardize column names
+colnames(expr)[1:2] <- c("STUDY_ID", "Sample_ID")
+colnames(mut)[2] <- "Sample_ID"
+
+# Step 3: Merge expression + mutation data
+merged <- left_join(expr, mut[, c("Sample_ID", "NRAS")], by = "Sample_ID")
+
+# Step 4: Label NRAS status
+merged <- merged %>%
+  mutate(NRAS_status = ifelse(NRAS == "WT", "WT", "Mutant"))
+
+# Step 5: Select genes of interest
+genes_of_interest <- c("GNAI3", "SLC25A24", "SYPL2", "SIKE1", "STRIP1", 
+                       "PRPF38B", "TAF13", "NBPF6")
+
+# Step 6: Convert to long format
+long_expr <- merged %>%
+  select(Sample_ID, NRAS_status, all_of(genes_of_interest)) %>%
+  pivot_longer(cols = -c(Sample_ID, NRAS_status), names_to = "Gene", values_to = "Expression")
+
+# Filter out NA in NRAS status
+long_expr <- long_expr %>% filter(!is.na(NRAS_status))
+
+# Define comparison explicitly
+comparisons <- list(c("Mutant", "WT"))
+
+
+# Step 7: Plot with significance annotations
+ggplot(long_expr, aes(x = NRAS_status, y = Expression, fill = NRAS_status)) +
+  geom_boxplot(alpha = 0.7, outlier.shape = NA) +
+  geom_jitter(width = 0.2, alpha = 0.5, size = 1) 
+  facet_wrap(~ Gene, scales = "free_y") +
+  + stat_compare_means(
+    comparisons = list(c("Mutant", "WT")),
+    method = "t.test",
+    label = "p.signif",
+    label.y.npc = "top",
+    size = 5 +
+  scale_fill_manual(values = c("Mutant" = "#F8766D", "WT" = "gray60")) +
+  labs(y = "Expression Z-score", x = "NRAS status") +
+  theme_bw() +
+  theme(strip.text = element_text(size = 14, face = "bold"),
+        axis.text = element_text(size = 10),
+        legend.position = "right")
+  
+  
+  # 4. Label NRAS mutation status
+  long_expr <- long_expr %>%
+    mutate(NRAS_status = ifelse(NRAS == "WT", "WT", "Mutant"))
+  
+  # 5. Remove NA NRAS status
+  long_expr <- long_expr %>% filter(!is.na(NRAS_status))
+  
+  # 6. Define comparisons
+  comparisons <- list(c("Mutant", "WT"))
+  
+  # 7. Plot with faceting and significance
+  ggplot(long_expr, aes(x = NRAS_status, y = Expression, fill = NRAS_status)) +
+    geom_boxplot(outlier.shape = NA, alpha = 0.6) +
+    geom_jitter(width = 0.2, size = 1, alpha = 0.5) +
+    stat_compare_means(
+      comparisons = comparisons,
+      method = "t.test",
+      label = "p.signif",
+      label.y.npc = "top",
+      size = 0.5
+    ) +
+    facet_wrap(~Gene, scales = "free_y") +
+    scale_fill_manual(values = c("Mutant" = "#F8766D", "WT" = "gray60")) +
+    theme_bw() +
+    ylab("Expression Z-score") +
+    xlab("NRAS status") +
+    theme(strip.text = element_text(face = "bold"))
+  # Assuming `long_expr` is already prepared as before...
+  
+  ggplot(long_expr, aes(x = NRAS_status, y = Expression, fill = NRAS_status)) +
+    geom_boxplot(outlier.shape = NA, alpha = 0.6) +
+    geom_jitter(width = 0.2, size = 0.5, alpha = 0.5) +
+    stat_compare_means(
+      comparisons = list(c("Mutant", "WT")),
+      method = "t.test",
+      label = "p.format",           # Show p-value instead of just stars
+      label.y = 4,                  # Position of label (adjust upward if needed)
+      size = 2
+    ) +
+    facet_wrap(~Gene, scales = "free_y") +
+    scale_fill_manual(values = c("Mutant" = "#F8766D", "WT" = "gray60")) +
+    theme_bw() +
+    ylab("Expression Z-score") +
+    xlab("NRAS status") +
+    theme(
+      strip.text = element_text(face = "bold"),
+      legend.position = "right"
+    )
